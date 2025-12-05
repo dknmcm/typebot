@@ -36,9 +36,8 @@ class ScreenMonitor:
             return
 
         self.monitoring = True
-        self.last_hash = None  # Reset hash to trigger initial capture
+        self.last_hash = None
 
-        # Start monitoring in separate thread
         self.monitor_thread = threading.Thread(target=self._monitor_loop, daemon=True)
         self.monitor_thread.start()
         print("Screen monitoring started")
@@ -57,16 +56,13 @@ class ScreenMonitor:
         print("Screen monitoring stopped")
 
     def _monitor_loop(self):
-        """Main monitoring loop (runs in separate thread)"""
         print("Monitor loop started")
 
         while self.monitoring:
             try:
-                # Capture current screenshot
                 screenshot = self._capture_region()
 
                 if screenshot:
-                    # Calculate hash for change detection
                     current_hash = self._get_image_hash(screenshot)
 
                     # Check if image changed
@@ -74,7 +70,6 @@ class ScreenMonitor:
                         print(f"Change detected! Hash: {current_hash[:8]}...")
                         self.last_hash = current_hash
 
-                        # Trigger callback if registered
                         if self.change_callback:
                             self.change_callback(screenshot)
                         else:
@@ -90,12 +85,8 @@ class ScreenMonitor:
         print("Monitor loop ended")
 
     def _capture_region(self) -> Optional[Image.Image]:
-        """Capture screenshot of specified region"""
         try:
-            # Capture screenshot using mss
             screenshot = self.sct.grab(self.region)
-
-            # Convert to PIL Image
             image = Image.frombytes('RGB', screenshot.size, screenshot.rgb)
 
             return image
@@ -105,26 +96,26 @@ class ScreenMonitor:
             return None
 
     def _get_image_hash(self, image: Image.Image) -> str:
-        """Generate hash for change detection"""
         try:
-            # Resize image for faster hashing
-            small_image = image.resize((32, 32), Image.Resampling.LANCZOS)
+            small_image = image.resize((16, 16), Image.Resampling.LANCZOS)
 
-            # Convert to grayscale for better comparison
+            # Convert to grayscale to ignore minor color variations
             gray_image = small_image.convert('L')
 
-            # Convert to bytes and hash
-            image_bytes = gray_image.tobytes()
+            # Apply slight blur to reduce noise from anti-aliasing
+            from PIL import ImageFilter
+            blurred = gray_image.filter(ImageFilter.BLUR)
+
+            image_bytes = blurred.tobytes()
             hash_obj = hashlib.md5(image_bytes)
 
             return hash_obj.hexdigest()
 
         except Exception as e:
             print(f"Error generating image hash: {e}")
-            return str(time.time())  # Fallback hash
+            return str(time.time())
 
     def get_status(self) -> Dict[str, any]:
-        """Get current monitoring status"""
         return {
             "monitoring": self.monitoring,
             "region_set": self.region is not None,
