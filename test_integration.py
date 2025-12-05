@@ -4,61 +4,66 @@ from datetime import datetime
 from src.core.region_selector import RegionSelector
 from src.core.screen_monitor import ScreenMonitor
 from src.core.ocr_processor import OCRProcessor
+from src.core.keystroke_generator import KeystrokeGenerator
 
 
-def test_single_ocr():
-    """Test single screenshot + OCR extraction"""
+def test_full_typing_pipeline():
+    """Test complete pipeline: Region → Screenshot → OCR → Typing"""
+
     os.makedirs("screenshots", exist_ok=True)
 
     monitor = ScreenMonitor()
     ocr = OCRProcessor()
+    typist = KeystrokeGenerator()
 
     def on_region_selected(x, y, width, height):
         """Called when user confirms region selection"""
         print(f"Region selected: x={x}, y={y}, width={width}, height={height}")
 
-        # Set region and take one screenshot
         monitor.set_region(x, y, width, height)
 
         print("Taking screenshot...")
         screenshot = monitor._capture_region()
 
         if screenshot:
-            # Save original screenshot
+            # Save screenshot for reference
             timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-            original_file = f"screenshots/original_{timestamp}.png"
-            screenshot.save(original_file)
-            print(f"Original saved: {original_file}")
+            screenshot.save(f"screenshots/pipeline_{timestamp}.png")
 
-            # Save processed image for comparison
-            processed_file = f"screenshots/processed_{timestamp}.png"
-            ocr.debug_save_processed_image(screenshot, processed_file)
-
-            # Extract text with confidence
+            # Extract text via OCR
+            print("Extracting text...")
             text, confidence = ocr.get_text_with_confidence(screenshot)
 
-            print("\n--- OCR Results ---")
+            print("\n--- Pipeline Results ---")
             print(f"Extracted text: '{text}'")
-            print(f"Confidence: {confidence:.1f}%")
-            print(f"Text length: {len(text)} characters")
+            print(f"OCR confidence: {confidence:.1f}%")
 
-            if confidence < 50:
-                print("⚠️  Low confidence - try selecting clearer text")
-            elif confidence < 80:
-                print("⚠️  Medium confidence - results may have errors")
+            if confidence < 70:
+                print("Low confidence - typing may have errors")
+
+            if text.strip():
+                print(f"\nReady to type {len(text)} characters...")
+                print("Click in a text field where you want the text typed.")
+
+                for i in range(5, 0, -1):
+                    print(f"Starting in {i}...")
+                    time.sleep(1)
+
+                typist.type_text(text, base_delay=0.1)
             else:
-                print("✅ High confidence - results should be accurate")
-
+                print("No text extracted - try selecting a clearer text region")
         else:
             print("Failed to capture screenshot")
 
-    print("Single OCR Test")
-    print("1. Position window over clear text")
-    print("2. Click 'Start' to capture and analyze")
+    print("Full Pipeline Test")
+    print("1. Position window over text you want to copy")
+    print("2. Click 'Start' to capture")
+    print("3. Switch to target text field")
+    print("4. Bot will type the captured text")
 
     selector = RegionSelector(on_region_selected)
     selector.show_selector()
 
 
 if __name__ == "__main__":
-    test_single_ocr()
+    test_full_typing_pipeline()
