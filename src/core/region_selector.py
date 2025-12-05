@@ -46,6 +46,9 @@ class RegionSelector:
         width = self.root.winfo_width()
         height = self.root.winfo_height() - 30
 
+        self.root.attributes('-alpha', 0.01)
+        self.root.update()
+
         self.root.destroy()
         self.on_region_confirmed(x, y, width, height)
 
