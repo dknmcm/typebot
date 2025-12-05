@@ -15,24 +15,119 @@ class ScreenMonitor:
         self.change_callback = None
         self.last_hash = None
         self.screenshot_interval = 0.5
+        self.sct = mss.mss()
 
     def set_region(self, x: int, y: int, width: int, height: int):
         """Set the screen region to monitor"""
+        self.region = {"top": y, "left": x, "width": width, "height": height}
+        print(f"Screen region set: {x},{y} ({width}x{height})")
 
-    def register_change_callback(self, callback: Callable):
+    def register_change_callback(self, callback: Callable[[Image.Image], None]):
         """Register function to call when changes detected"""
+        self.change_callback = callback
 
     def start_monitoring(self):
         """Begin background screenshot monitoring"""
+        if not self.region:
+            raise ValueError("No region set. Call set_region() first.")
+
+        if self.monitoring:
+            print("Already monitoring")
+            return
+
+        self.monitoring = True
+        self.last_hash = None  # Reset hash to trigger initial capture
+
+        # Start monitoring in separate thread
+        self.monitor_thread = threading.Thread(target=self._monitor_loop, daemon=True)
+        self.monitor_thread.start()
+        print("Screen monitoring started")
 
     def stop_monitoring(self):
         """Stop monitoring and cleanup thread"""
+        if not self.monitoring:
+            return
+
+        self.monitoring = False
+
+        # Wait for thread to finish
+        if self.monitor_thread and self.monitor_thread.is_alive():
+            self.monitor_thread.join(timeout=1.0)
+
+        print("Screen monitoring stopped")
 
     def _monitor_loop(self):
         """Main monitoring loop (runs in separate thread)"""
+        print("Monitor loop started")
 
-    def _capture_region(self) -> Image:
+        while self.monitoring:
+            try:
+                # Capture current screenshot
+                screenshot = self._capture_region()
+
+                if screenshot:
+                    # Calculate hash for change detection
+                    current_hash = self._get_image_hash(screenshot)
+
+                    # Check if image changed
+                    if current_hash != self.last_hash:
+                        print(f"Change detected! Hash: {current_hash[:8]}...")
+                        self.last_hash = current_hash
+
+                        # Trigger callback if registered
+                        if self.change_callback:
+                            self.change_callback(screenshot)
+                        else:
+                            print("No callback registered for change detection")
+
+                # Wait before next capture
+                time.sleep(self.screenshot_interval)
+
+            except Exception as e:
+                print(f"Error in monitor loop: {e}")
+                time.sleep(self.screenshot_interval)
+
+        print("Monitor loop ended")
+
+    def _capture_region(self) -> Optional[Image.Image]:
         """Capture screenshot of specified region"""
+        try:
+            # Capture screenshot using mss
+            screenshot = self.sct.grab(self.region)
 
-    def _get_image_hash(self, image: Image) -> str:
+            # Convert to PIL Image
+            image = Image.frombytes('RGB', screenshot.size, screenshot.rgb)
+
+            return image
+
+        except Exception as e:
+            print(f"Error capturing screenshot: {e}")
+            return None
+
+    def _get_image_hash(self, image: Image.Image) -> str:
         """Generate hash for change detection"""
+        try:
+            # Resize image for faster hashing
+            small_image = image.resize((32, 32), Image.Resampling.LANCZOS)
+
+            # Convert to grayscale for better comparison
+            gray_image = small_image.convert('L')
+
+            # Convert to bytes and hash
+            image_bytes = gray_image.tobytes()
+            hash_obj = hashlib.md5(image_bytes)
+
+            return hash_obj.hexdigest()
+
+        except Exception as e:
+            print(f"Error generating image hash: {e}")
+            return str(time.time())  # Fallback hash
+
+    def get_status(self) -> Dict[str, any]:
+        """Get current monitoring status"""
+        return {
+            "monitoring": self.monitoring,
+            "region_set": self.region is not None,
+            "last_hash": self.last_hash[:8] + "..." if self.last_hash else None,
+            "interval": self.screenshot_interval
+        }

@@ -1,4 +1,5 @@
 import tkinter as tk
+import time
 from typing import Callable, Optional, Tuple
 
 
@@ -23,7 +24,6 @@ class RegionSelector:
         self.root.mainloop()
 
     def create_window_content(self):
-        """Create minimal interface with just start button"""
         self.root.configure(bg='')
 
         start_btn = tk.Button(self.root, text="Start",
@@ -38,19 +38,16 @@ class RegionSelector:
         start_btn.place(relx=1.0, rely=1.0, anchor='se', x=-10, y=-10)
 
     def make_resizable(self):
-        # Standard tkinter resizing works with overrideredirect=False
         self.root.resizable(True, True)
 
     def confirm_selection(self):
-        """Start monitoring with current window coordinates"""
         x = self.root.winfo_x()
-        y = self.root.winfo_y() + 60
+        y = self.root.winfo_y() + 30
         width = self.root.winfo_width()
-        height = self.root.winfo_height() - 60
+        height = self.root.winfo_height() - 30
 
         self.root.destroy()
         self.on_region_confirmed(x, y, width, height)
 
     def cancel_selection(self):
-        """Cancel region selection"""
         self.root.destroy()
