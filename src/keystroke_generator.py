@@ -133,3 +133,32 @@ class KeystrokeGenerator:
         # Occasional energy boost
         if self.session.characters_typed > 100 and random.random() < 0.1:
             self.session.current_fatigue *= 0.7
+
+    def _type_character(self, char: str):
+        """Type a single character"""
+        try:
+            if char == '\n':
+                self.keyboard.press(Key.enter)
+                time.sleep(0.05)
+                self.keyboard.release(Key.enter)
+            elif char == '\t':
+                self.keyboard.press(Key.tab)
+                time.sleep(0.05)
+                self.keyboard.release(Key.tab)
+            else:
+                self.keyboard.type(char)
+                time.sleep(0.05)
+        except Exception as e:
+            print(f"Error typing character '{char}': {e}")
+
+    def type_backspace(self, count: int = 1):
+        """Type backspace key(s)"""
+        for _ in range(count):
+            self.keyboard.press(Key.backspace)
+            time.sleep(0.05)
+            self.keyboard.release(Key.backspace)
+            time.sleep(0.1)
+
+    def stop_typing(self):
+        """Stop current typing operation"""
+        self.typing_active = False

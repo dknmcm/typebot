@@ -13,7 +13,7 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from config.config import (
     SCREENSHOT_INTERVAL, MIN_OCR_CONFIDENCE,
-    BASE_WPM, BASE_ERROR_RATE
+    BASE_WPM, BASE_ERROR_RATE, SESSION_DURATION, SESSION_START_DELAY
 )
 
 
@@ -26,6 +26,7 @@ class TypeBot:
         self.running = False
         self.current_text = ""
         self.last_processed_text = ""
+        self.typing_thread = None
 
         self.monitor.screenshot_interval = SCREENSHOT_INTERVAL
 
@@ -41,6 +42,8 @@ class TypeBot:
 
     def start_monitoring_session(self):
         """Start 30-second continuous monitoring session"""
+        time.sleep(SESSION_START_DELAY)
+
         self.running = True
 
         self.monitor.start_monitoring()
@@ -54,12 +57,10 @@ class TypeBot:
             self.stop_session()
 
     def run_session(self):
-        """Run monitoring session for 30 seconds"""
         start_time = time.time()
-        session_duration = 30.0
 
-        while self.running and (time.time() - start_time) < session_duration:
-            remaining = session_duration - (time.time() - start_time)
+        while self.running and (time.time() - start_time) < SESSION_DURATION:
+            remaining = SESSION_DURATION - (time.time() - start_time)
             if remaining > 0:
                 time.sleep(1)
 
@@ -71,6 +72,12 @@ class TypeBot:
             return
 
         try:
+            timestamp = datetime.now().strftime("%Y%m%d_%H%M%S_%f")[:-3]
+            debug_filename = f"screenshots/debug_{timestamp}.png"
+
+            os.makedirs("screenshots", exist_ok=True)
+            screenshot.save(debug_filename)
+
             text, confidence = self.ocr.get_text_with_confidence(screenshot)
 
             if confidence < MIN_OCR_CONFIDENCE:
@@ -89,22 +96,40 @@ class TypeBot:
             print(f"Error processing text change: {e}")
 
     def process_new_text(self, text: str, confidence: float):
-        """Process and type new text"""
+        """Process and type new text - stop previous typing first"""
+        if self.typing_thread and self.typing_thread.is_alive():
+            print("Stopping previous typing...")
+            self.typist.stop_typing()
+            self.typing_thread.join(timeout=1.0)
+
         new_content = self.get_text_difference(self.last_processed_text, text)
 
         if new_content.strip():
             timestamp = datetime.now().strftime("%H:%M:%S")
-            print(f"\n[{timestamp}] 📝 New text detected (confidence: {confidence:.1f}%)")
+            print(f"\n[{timestamp}] New content detected (confidence: {confidence:.1f}%)")
             print(f"Typing: '{new_content}'")
 
-            typing_thread = threading.Thread(
+            self.typing_thread = threading.Thread(
                 target=self.typist.type_human_like,
                 args=(new_content,),
                 daemon=True
             )
-            typing_thread.start()
+            self.typing_thread.start()
 
             self.last_processed_text = text
+
+    def stop_session(self):
+        """Stop monitoring session"""
+        print("\nStopping session...")
+        self.running = False
+
+        if self.typist:
+            self.typist.stop_typing()
+
+        if self.monitor:
+            self.monitor.stop_monitoring()
+
+        print("Session stopped")
 
     def get_text_difference(self, old_text: str, new_text: str) -> str:
         """Extract new content from text comparison"""
@@ -116,20 +141,6 @@ class TypeBot:
             return new_text.strip()
 
         return ""
-
-    def stop_session(self):
-        """Stop monitoring session"""
-        print("\nStopping session...")
-        self.running = False
-
-        # Stop components
-        if self.monitor:
-            self.monitor.stop_monitoring()
-
-        if self.typist:
-            self.typist.stop_typing()
-
-        print("✅ Session stopped")
 
     def get_session_stats(self):
         """Get current session statistics"""
