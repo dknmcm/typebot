@@ -9,7 +9,13 @@ import sys
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from config.config import BASE_WPM, BASE_ERROR_RATE, CHAR_PAIR_ADJUSTMENTS, COMMON_TYPOS
+from config.config import (
+    BASE_WPM, BASE_ERROR_RATE, CHAR_PAIR_ADJUSTMENTS, COMMON_TYPOS,
+    WPM_VARIATION, MIN_KEYSTROKE_DELAY, MAX_THINKING_PAUSE,
+    WORD_PAUSE_MIN, WORD_PAUSE_MAX, SENTENCE_PAUSE_MIN, SENTENCE_PAUSE_MAX,
+    CORRECTION_DELAY_MIN, CORRECTION_DELAY_MAX, MAX_FATIGUE, FATIGUE_BUILDUP_CHARS,
+    ENERGY_BOOST_CHANCE, FATIGUE_ERROR_MULTIPLIER, THINKING_PAUSE_PROBABILITY
+)
 
 
 @dataclass
@@ -17,7 +23,7 @@ class TypingSession:
     start_time: float
     characters_typed: int = 0
     errors_made: int = 0
-    base_wpm: float = 60.0
+    base_wpm: float = BASE_WPM
     current_fatigue: float = 0.0
 
 
@@ -82,7 +88,7 @@ class KeystrokeGenerator:
         chars_per_second = (self.base_wpm * 5) / 60
         base_delay = 1.0 / chars_per_second
 
-        variation = random.uniform(-0.2, 0.2)
+        variation = random.uniform(-WPM_VARIATION, WPM_VARIATION)
         delay = base_delay * (1 + variation)
 
         if previous_char and current_char:
@@ -93,8 +99,8 @@ class KeystrokeGenerator:
         fatigue_factor = 1 + (self.session.current_fatigue * 0.3)
         delay *= fatigue_factor
 
-        if random.random() < 0.05:
-            delay += random.uniform(0.3, 1.0)
+        if random.random() < THINKING_PAUSE_PROBABILITY:
+            delay += random.uniform(0.0, MAX_THINKING_PAUSE)
 
         return max(delay, 0.05)
 
@@ -103,7 +109,7 @@ class KeystrokeGenerator:
         if not char.isalpha():
             return False, char
 
-        error_probability = self.error_rate + (self.session.current_fatigue * 0.02)
+        error_probability = self.error_rate + (self.session.current_fatigue * FATIGUE_ERROR_MULTIPLIER)
 
         if random.random() < error_probability:
             char_lower = char.lower()
@@ -116,22 +122,24 @@ class KeystrokeGenerator:
 
     def _get_correction_delay(self) -> float:
         """Get delay before correcting mistake"""
-        return random.uniform(0.2, 0.8) if random.random() < 0.3 else random.uniform(0.5, 1.5)
+        return random.uniform(CORRECTION_DELAY_MIN, CORRECTION_DELAY_MAX)
 
     def _get_word_pause_delay(self) -> float:
         """Get delay between words"""
-        return random.uniform(0.1, 0.3)
+        return random.uniform(WORD_PAUSE_MIN, WORD_PAUSE_MAX)
 
     def _get_sentence_pause_delay(self) -> float:
         """Get delay after sentences"""
-        return random.uniform(0.5, 1.2)
+        return random.uniform(SENTENCE_PAUSE_MIN, SENTENCE_PAUSE_MAX)
 
     def _update_fatigue(self):
         """Update typing fatigue"""
-        self.session.current_fatigue = min(0.5, self.session.characters_typed / 500.0)
+        self.session.current_fatigue = min(MAX_FATIGUE, 
+                                           self.session.characters_typed / 
+                                           FATIGUE_BUILDUP_CHARS)
 
         # Occasional energy boost
-        if self.session.characters_typed > 100 and random.random() < 0.1:
+        if self.session.characters_typed > 100 and random.random() < ENERGY_BOOST_CHANCE: 
             self.session.current_fatigue *= 0.7
 
     def _type_character(self, char: str):

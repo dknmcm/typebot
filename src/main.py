@@ -5,6 +5,8 @@ from region_selector import RegionSelector
 from screen_monitor import ScreenMonitor
 from ocr_processor import OCRProcessor
 from keystroke_generator import KeystrokeGenerator
+from text_accumulator import TextAccumulator
+from typing_manager import TypingManager
 import os
 from pathlib import Path
 import sys
@@ -21,13 +23,11 @@ class TypeBot:
     def __init__(self):
         self.monitor = ScreenMonitor()
         self.ocr = OCRProcessor()
-        self.typist = KeystrokeGenerator(BASE_WPM, BASE_ERROR_RATE)
+
+        self.text_accumulator = TextAccumulator()
+        self.typing_manager = TypingManager()
 
         self.running = False
-        self.current_text = ""
-        self.last_processed_text = ""
-        self.typing_thread = None
-
         self.monitor.screenshot_interval = SCREENSHOT_INTERVAL
 
     def start_session(self):
@@ -45,6 +45,8 @@ class TypeBot:
         time.sleep(SESSION_START_DELAY)
 
         self.running = True
+
+        self.typing_manager.start()
 
         self.monitor.start_monitoring()
 
@@ -67,80 +69,30 @@ class TypeBot:
         self.stop_session()
 
     def on_text_changed(self, screenshot):
-        """Called when screen content changes"""
+        """Process text changes and add to accumulator"""
         if not self.running:
             return
 
         try:
-            timestamp = datetime.now().strftime("%Y%m%d_%H%M%S_%f")[:-3]
-            debug_filename = f"screenshots/debug_{timestamp}.png"
-
-            os.makedirs("screenshots", exist_ok=True)
-            screenshot.save(debug_filename)
-
             text, confidence = self.ocr.get_text_with_confidence(screenshot)
 
-            if confidence < MIN_OCR_CONFIDENCE:
-                print(f"Low OCR confidence ({confidence:.1f}%) - skipping")
+            if confidence < MIN_OCR_CONFIDENCE or not text.strip():
                 return
 
-            if not text.strip():
-                return
+            new_words = self.text_accumulator.add_new_text(text)
 
-            if self.ocr.is_text_similar(text, self.last_processed_text):
-                return
-
-            self.process_new_text(text, confidence)
+            if new_words:
+                self.typing_manager.add_text_to_type(new_words)
 
         except Exception as e:
-            print(f"Error processing text change: {e}")
-
-    def process_new_text(self, text: str, confidence: float):
-        """Process and type new text - stop previous typing first"""
-        if self.typing_thread and self.typing_thread.is_alive():
-            print("Stopping previous typing...")
-            self.typist.stop_typing()
-            self.typing_thread.join(timeout=1.0)
-
-        new_content = self.get_text_difference(self.last_processed_text, text)
-
-        if new_content.strip():
-            timestamp = datetime.now().strftime("%H:%M:%S")
-            print(f"\n[{timestamp}] New content detected (confidence: {confidence:.1f}%)")
-            print(f"Typing: '{new_content}'")
-
-            self.typing_thread = threading.Thread(
-                target=self.typist.type_human_like,
-                args=(new_content,),
-                daemon=True
-            )
-            self.typing_thread.start()
-
-            self.last_processed_text = text
+            print(f"Error processing text: {e}")
 
     def stop_session(self):
-        """Stop monitoring session"""
-        print("\nStopping session...")
+        """Stop both processes"""
         self.running = False
 
-        if self.typist:
-            self.typist.stop_typing()
-
-        if self.monitor:
-            self.monitor.stop_monitoring()
-
-        print("Session stopped")
-
-    def get_text_difference(self, old_text: str, new_text: str) -> str:
-        """Extract new content from text comparison"""
-        if len(new_text) > len(old_text) and old_text in new_text:
-            old_end = new_text.find(old_text) + len(old_text)
-            return new_text[old_end:].strip()
-
-        if old_text != new_text:
-            return new_text.strip()
-
-        return ""
+        self.typing_manager.stop()
+        self.monitor.stop_monitoring()
 
     def get_session_stats(self):
         """Get current session statistics"""

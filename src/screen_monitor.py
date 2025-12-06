@@ -75,7 +75,6 @@ class ScreenMonitor:
                         else:
                             print("No callback registered for change detection")
 
-                # Wait before next capture
                 time.sleep(self.screenshot_interval)
 
             except Exception as e:
