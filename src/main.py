@@ -29,19 +29,22 @@ class TypeBot:
 
         self.running = False
         self.monitor.screenshot_interval = SCREENSHOT_INTERVAL
+        self.selector = None
+        self.session_duration = 30.0
 
     def start_session(self):
         """Main application entry point"""
         selector = RegionSelector(self.on_region_selected)
         selector.show_selector()
 
-    def on_region_selected(self, x: int, y: int, width: int, height: int):
+    def on_region_selected(self, x: int, y: int, width: int, height: int, duration: float):
+        self.session_duration = duration
         self.monitor.set_region(x, y, width, height)
         self.monitor.register_change_callback(self.on_text_changed)
         self.start_monitoring_session()
 
     def start_monitoring_session(self):
-        """Start 30-second continuous monitoring session"""
+        """Start continuous monitoring session"""
         time.sleep(SESSION_START_DELAY)
 
         self.running = True
@@ -61,8 +64,8 @@ class TypeBot:
     def run_session(self):
         start_time = time.time()
 
-        while self.running and (time.time() - start_time) < SESSION_DURATION:
-            remaining = SESSION_DURATION - (time.time() - start_time)
+        while self.running and (time.time() - start_time) < self.session_duration:
+            remaining = self.session_duration - (time.time() - start_time)
             if remaining > 0:
                 time.sleep(1)
 
@@ -100,6 +103,30 @@ class TypeBot:
         self.typing_manager.stop()
         self.monitor.stop_monitoring()
 
+    def reset_for_new_session(self):
+        self.stop_session()
+        self.text_accumulator.reset()
+        self.typing_manager.reset_index()
+
+        if self.selector:
+            self.selector.restore_transparency()
+
+        self.running = False
+
+        if hasattr(self.monitor, 'last_hash'):
+            self.monitor.last_hash = None
+
+    def cleanup(self):
+        self.stop_session()
+
+        try:
+            if self.typing_manager:
+                self.typing_manager.stop()
+            if self.monitor:
+                self.monitor.stop_monitoring()
+        except:
+            pass
+
     def get_session_stats(self):
         """Get current session statistics"""
         return {
@@ -111,10 +138,17 @@ class TypeBot:
 
 
 def main():
-    """Main application entry point"""
     try:
         bot = TypeBot()
-        bot.start_session()
+
+        while True:
+            try:
+                bot.start_session()
+                bot.reset_for_new_session()
+            except KeyboardInterrupt:
+                bot.cleanup()
+                break
+
     except Exception as e:
         print(f"Application error: {e}")
 

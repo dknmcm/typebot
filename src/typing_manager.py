@@ -46,9 +46,19 @@ class TypingManager:
                             time.sleep(correction_delay)
 
                             self.typist.type_backspace(1)
-                            time.sleep(0.05)
+                            time.sleep(0.02)
 
-                        self.typist._type_character(char)
+                            self.typist._type_character(char)
+                        else:
+                            # Check for uncorrected errors
+                            should_uncorrected_error, uncorrected_char = self.typist._should_make_uncorrected_error(char)
+
+                            if should_uncorrected_error:
+                                self.typist._type_character(uncorrected_char)
+                                self.typist.session.errors_made += 1
+                            else:
+                                self.typist._type_character(char)
+
                         self.typing_index += 1
                         self.typist.session.characters_typed += 1
 

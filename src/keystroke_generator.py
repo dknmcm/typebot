@@ -10,7 +10,7 @@ import sys
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from config.config import (
-    BASE_WPM, BASE_ERROR_RATE, CHAR_PAIR_ADJUSTMENTS, COMMON_TYPOS,
+    BASE_WPM, BASE_ERROR_RATE, UNCORRECTED_ERROR_RATE, CHAR_PAIR_ADJUSTMENTS, COMMON_TYPOS,
     WPM_VARIATION, MIN_KEYSTROKE_DELAY, MAX_THINKING_PAUSE,
     WORD_PAUSE_MIN, WORD_PAUSE_MAX, SENTENCE_PAUSE_MIN, SENTENCE_PAUSE_MAX,
     CORRECTION_DELAY_MIN, CORRECTION_DELAY_MAX, MAX_FATIGUE, FATIGUE_BUILDUP_CHARS,
@@ -65,6 +65,22 @@ class KeystrokeGenerator:
             return False, char
 
         error_probability = self.error_rate + (self.session.current_fatigue * FATIGUE_ERROR_MULTIPLIER)
+
+        if random.random() < error_probability:
+            char_lower = char.lower()
+            if char_lower in self.common_typos:
+                typo = random.choice(self.common_typos[char_lower])
+                typo = typo.upper() if char.isupper() else typo
+                return True, typo
+
+        return False, char
+    
+    def _should_make_uncorrected_error(self, char: str) -> Tuple[bool, str]:
+        """Determine if an uncorrected error should be made"""
+        if not char.isalpha():
+            return False, char
+
+        error_probability = UNCORRECTED_ERROR_RATE + (self.session.current_fatigue * FATIGUE_ERROR_MULTIPLIER)
 
         if random.random() < error_probability:
             char_lower = char.lower()
