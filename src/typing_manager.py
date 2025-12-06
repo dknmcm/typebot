@@ -1,14 +1,15 @@
 import threading
 import time
-from queue import Queue
 from keystroke_generator import KeystrokeGenerator
+from text_accumulator import TextAccumulator
 from config.config import BASE_WPM, BASE_ERROR_RATE
 
 
 class TypingManager:
-    def __init__(self):
+    def __init__(self, text_accumulator: TextAccumulator):
         self.typist = KeystrokeGenerator(BASE_WPM, BASE_ERROR_RATE)
-        self.typing_queue = Queue()
+        self.text_accumulator = text_accumulator
+        self.typing_index = 0
         self.typing_thread = None
         self.running = False
 
@@ -18,26 +19,53 @@ class TypingManager:
         self.typing_thread = threading.Thread(target=self._typing_worker, daemon=True)
         self.typing_thread.start()
 
-    def add_text_to_type(self, text: str):
-        """Add text to typing queue"""
-        if text.strip():
-            self.typing_queue.put(text.strip())
-
     def _typing_worker(self):
-        """Independent typing worker thread"""
+        """Independent typing worker that follows master text"""
         while self.running:
             try:
-                # Wait for text to type (with timeout)
-                text = self.typing_queue.get(timeout=1.0)
+                master_text = self.text_accumulator.get_master_text()
 
-                if text and self.running:
-                    self.typist.type_human_like(text)
+                if len(master_text) > self.typing_index:
+                    remaining_text = master_text[self.typing_index:]
 
-                self.typing_queue.task_done()
+                    previous_char = None
+                    for i, char in enumerate(remaining_text):
+                        if not self.running:
+                            break
 
-            except:
-                # Timeout or other error - continue loop
-                continue
+                        should_error, actual_char = self.typist._should_make_error(char)
+
+                        delay = self.typist._get_keystroke_delay(char, previous_char)
+                        time.sleep(delay)
+
+                        if should_error:
+                            self.typist._type_character(actual_char)
+                            self.typist.session.errors_made += 1
+
+                            correction_delay = self.typist._get_correction_delay()
+                            time.sleep(correction_delay)
+
+                            self.typist.type_backspace(1)
+                            time.sleep(0.05)
+
+                        self.typist._type_character(char)
+                        self.typing_index += 1
+                        self.typist.session.characters_typed += 1
+
+                        # if i % 100 == 0:
+                        #     self.typist._update_fatigue()
+
+                        if char == ' ':
+                            time.sleep(self.typist._get_word_pause_delay())
+                        elif char in '.!?':
+                            time.sleep(self.typist._get_sentence_pause_delay())
+
+                        previous_char = char
+                else:
+                    time.sleep(0.01)
+
+            except Exception as e:
+                time.sleep(0.05)
 
     def stop(self):
         """Stop typing process"""
@@ -47,11 +75,15 @@ class TypingManager:
         if self.typing_thread and self.typing_thread.is_alive():
             self.typing_thread.join(timeout=2.0)
 
-    def clear_queue(self):
-        """Clear pending typing tasks"""
-        while not self.typing_queue.empty():
-            try:
-                self.typing_queue.get_nowait()
-                self.typing_queue.task_done()
-            except:
-                break
+    def get_typing_progress(self):
+        master_text = self.text_accumulator.get_master_text()
+        return {
+            'typed_chars': self.typing_index,
+            'total_chars': len(master_text),
+            'remaining': len(master_text) - self.typing_index,
+            'progress_percent': (self.typing_index / len(master_text) * 100) if master_text else 0
+        }
+
+    def reset_index(self):
+        """Reset typing index to start over"""
+        self.typing_index = 0

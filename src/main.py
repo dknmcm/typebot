@@ -25,7 +25,7 @@ class TypeBot:
         self.ocr = OCRProcessor()
 
         self.text_accumulator = TextAccumulator()
-        self.typing_manager = TypingManager()
+        self.typing_manager = TypingManager(self.text_accumulator)
 
         self.running = False
         self.monitor.screenshot_interval = SCREENSHOT_INTERVAL
@@ -80,9 +80,6 @@ class TypeBot:
                 return
 
             new_words = self.text_accumulator.add_new_text(text)
-
-            if new_words:
-                self.typing_manager.add_text_to_type(new_words)
 
         except Exception as e:
             print(f"Error processing text: {e}")

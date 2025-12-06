@@ -40,7 +40,6 @@ class ScreenMonitor:
 
         self.monitor_thread = threading.Thread(target=self._monitor_loop, daemon=True)
         self.monitor_thread.start()
-        print("Screen monitoring started")
 
     def stop_monitoring(self):
         """Stop monitoring and cleanup thread"""
@@ -56,8 +55,6 @@ class ScreenMonitor:
         print("Screen monitoring stopped")
 
     def _monitor_loop(self):
-        print("Monitor loop started")
-
         while self.monitoring:
             try:
                 screenshot = self._capture_region()
@@ -67,7 +64,6 @@ class ScreenMonitor:
 
                     # Check if image changed
                     if current_hash != self.last_hash:
-                        print(f"Change detected! Hash: {current_hash[:8]}...")
                         self.last_hash = current_hash
 
                         if self.change_callback:
@@ -80,8 +76,6 @@ class ScreenMonitor:
             except Exception as e:
                 print(f"Error in monitor loop: {e}")
                 time.sleep(self.screenshot_interval)
-
-        print("Monitor loop ended")
 
     def _capture_region(self) -> Optional[Image.Image]:
         try:

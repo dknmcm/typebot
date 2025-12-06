@@ -38,51 +38,6 @@ class KeystrokeGenerator:
         self.char_pair_delays = CHAR_PAIR_ADJUSTMENTS
         self.common_typos = COMMON_TYPOS
 
-    def type_human_like(self, text: str):
-        """Type text with realistic human behavior"""
-        self.typing_active = True
-        self.session = TypingSession(start_time=time.time(), base_wpm=self.base_wpm)
-
-        try:
-            previous_char = None
-
-            for i, char in enumerate(text):
-                if not self.typing_active:
-                    break
-
-                should_error, actual_char = self._should_make_error(char)
-
-                delay = self._get_keystroke_delay(char, previous_char)
-                time.sleep(delay)
-
-                if should_error:
-                    self._type_character(actual_char)
-                    self.session.errors_made += 1
-
-                    correction_delay = self._get_correction_delay()
-                    time.sleep(correction_delay)
-
-                    self.type_backspace(1)
-                    time.sleep(0.1)
-
-                self._type_character(char)
-                self.session.characters_typed += 1
-
-                if i % 20 == 0:
-                    self._update_fatigue()
-
-                if char == ' ':
-                    time.sleep(self._get_word_pause_delay())
-                elif char in '.!?':
-                    time.sleep(self._get_sentence_pause_delay())
-
-                previous_char = char
-
-        except Exception as e:
-            print(f"Error in human-like typing: {e}")
-        finally:
-            self.typing_active = False
-
     def _get_keystroke_delay(self, current_char: str, previous_char: str = None) -> float:
         """Calculate realistic delay before typing character"""
         chars_per_second = (self.base_wpm * 5) / 60
@@ -147,15 +102,15 @@ class KeystrokeGenerator:
         try:
             if char == '\n':
                 self.keyboard.press(Key.enter)
-                time.sleep(0.05)
+                time.sleep(0.03)
                 self.keyboard.release(Key.enter)
             elif char == '\t':
                 self.keyboard.press(Key.tab)
-                time.sleep(0.05)
+                time.sleep(0.03)
                 self.keyboard.release(Key.tab)
             else:
                 self.keyboard.type(char)
-                time.sleep(0.05)
+                time.sleep(0.0)
         except Exception as e:
             print(f"Error typing character '{char}': {e}")
 
