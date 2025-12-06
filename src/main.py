@@ -74,6 +74,15 @@ class TypeBot:
             return
 
         try:
+            # SAVE SCREENSHOTS
+            # timestamp = datetime.now().strftime("%Y%m%d_%H%M%S_%f")[:-3]
+            # os.makedirs("screenshots", exist_ok=True)
+            # raw_path = f"screenshots/raw_{timestamp}.png"
+            # screenshot.save(raw_path)
+            # processed_image = self.ocr.preprocess_image(screenshot)
+            # processed_path = f"screenshots/processed_{timestamp}.png"
+            # processed_image.save(processed_path)
+
             text, confidence = self.ocr.get_text_with_confidence(screenshot)
 
             if confidence < MIN_OCR_CONFIDENCE or not text.strip():

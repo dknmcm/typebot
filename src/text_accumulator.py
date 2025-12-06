@@ -20,12 +20,14 @@ class TextAccumulator:
             new_words = ocr_text.strip().split()
 
             if not self.master_words:
-                # First text - add everything
-                self.master_words = new_words.copy()
-                self.seen_words = set(enumerate(new_words))
-                self.master_text = ' '.join(self.master_words)
-                print(f"Initial text: '{self.master_text}'")
-                return self.master_text
+                filtered_words = self._filter_initial_cursor_artifacts(new_words)
+
+                if filtered_words:
+                    self.master_words = filtered_words
+                    self.seen_words = set(enumerate(filtered_words))
+                    self.master_text = ' '.join(self.master_words)
+                    print(f"Initial text: '{self.master_text}'")
+                    return self.master_text
 
             # Find new words using sequence matching
             new_additions = self._find_new_words(new_words)
@@ -51,8 +53,22 @@ class TextAccumulator:
             if [w.lower() for w in master_suffix] == [w.lower() for w in new_prefix]:
                 # Found overlap, return everything after
                 new_additions = new_words[i:]
-                print(f"Found suffix/prefix match (overlap: {i}), adding: {new_additions}")
+
                 return new_additions
+            
+    def _filter_initial_cursor_artifacts(self, words: List[str]) -> List[str]:
+        """Remove cursor artifacts from initial text detection"""
+        if not words:
+            return []
+
+        full_text = ' '.join(words)
+
+        for i, char in enumerate(full_text):
+            if char.isalpha():
+                clean_text = full_text[i:]
+                return clean_text.split()
+
+        return []
 
     def get_master_text(self) -> str:
         """Get current master text"""
