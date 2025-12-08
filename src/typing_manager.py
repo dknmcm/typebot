@@ -72,7 +72,7 @@ class TypingManager:
 
                         previous_char = char
                 else:
-                    time.sleep(0.01)
+                    time.sleep(0.3)
 
             except Exception as e:
                 time.sleep(0.05)

@@ -57,7 +57,7 @@ class KeystrokeGenerator:
         if random.random() < THINKING_PAUSE_PROBABILITY:
             delay += random.uniform(0.0, MAX_THINKING_PAUSE)
 
-        return max(delay, 0.05)
+        return delay
 
     def _should_make_error(self, char: str) -> Tuple[bool, str]:
         """Determine if error should be made and what typo"""
